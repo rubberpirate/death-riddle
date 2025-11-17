@@ -1,0 +1,60 @@
+/* Death Riddle - Main Stylesheet */
+
+QMainWindow {
+    background-color: #0f0f1e;
+}
+
+QMenuBar {
+    background-color: #1a1a2e;
+    color: #E0E0E0;
+    border-bottom: 2px solid #8B0000;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    padding: 5px 10px;
+}
+
+QMenuBar::item:selected {
+    background-color: #8B0000;
+}
+
+QMenu {
+    background-color: #1a1a2e;
+    color: #E0E0E0;
+    border: 2px solid #8B0000;
+}
+
+QMenu::item:selected {
+    background-color: #8B0000;
+}
+
+QScrollBar:vertical {
+    background: #1a1a2e;
+    width: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background: #4169E1;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #5179F1;
+}
+
+QScrollBar:horizontal {
+    background: #1a1a2e;
+    height: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #4169E1;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #5179F1;
+}

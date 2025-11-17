@@ -1,0 +1,319 @@
+#include "GameWidget.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPainter>
+#include <QTextEdit>
+#include <QPushButton>
+#include <QTimer>
+
+GameWidget::GameWidget(QWidget* parent)
+    : QWidget(parent)
+    , m_gameState(new GameState(this))
+    , m_endingWidget(nullptr)
+{
+    setupUI();
+    connectSignals();
+}
+
+void GameWidget::setupUI() {
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setSpacing(10);
+    mainLayout->setContentsMargins(15, 15, 15, 15);
+    
+    // Top bar: Health and Score
+    QHBoxLayout* topLayout = new QHBoxLayout();
+    
+    m_healthBar = new HealthBarWidget(this);
+    topLayout->addWidget(m_healthBar, 2);
+    
+    m_scoreLabel = new QLabel("Score: 0", this);
+    m_scoreLabel->setStyleSheet(
+        "QLabel {"
+        "    background-color: rgba(30, 30, 30, 200);"
+        "    color: #FFD700;"
+        "    padding: 10px;"
+        "    border: 2px solid #FFD700;"
+        "    border-radius: 5px;"
+        "    font-size: 16px;"
+        "    font-weight: bold;"
+        "}"
+    );
+    m_scoreLabel->setMinimumWidth(150);
+    topLayout->addWidget(m_scoreLabel);
+    
+    mainLayout->addLayout(topLayout);
+    
+    // Character display area
+    QHBoxLayout* characterLayout = new QHBoxLayout();
+    
+    // Player on left
+    m_playerWidget = new PlayerWidget(this);
+    characterLayout->addWidget(m_playerWidget, 1);
+    
+    // Game Master on right
+    m_gameMasterVisual = new QLabel(this);
+    m_gameMasterVisual->setMinimumSize(150, 200);
+    m_gameMasterVisual->setMaximumWidth(200);
+    m_gameMasterVisual->setAlignment(Qt::AlignCenter);
+    m_gameMasterVisual->setStyleSheet(
+        "QLabel {"
+        "    background-color: rgba(10, 10, 10, 200);"
+        "    border: 2px solid #8B0000;"
+        "    border-radius: 10px;"
+        "}"
+    );
+    m_gameMasterVisual->setText("👁️\n⚡\nGAME\nMASTER\n⚡");
+    m_gameMasterVisual->setWordWrap(true);
+    QFont gmFont;
+    gmFont.setPointSize(16);
+    gmFont.setBold(true);
+    m_gameMasterVisual->setFont(gmFont);
+    m_gameMasterVisual->setStyleSheet(
+        "QLabel {"
+        "    background-color: rgba(10, 10, 10, 220);"
+        "    color: #8B0000;"
+        "    border: 3px solid #8B0000;"
+        "    border-radius: 10px;"
+        "    padding: 20px;"
+        "}"
+    );
+    characterLayout->addWidget(m_gameMasterVisual, 1);
+    
+    mainLayout->addLayout(characterLayout, 1);
+    
+    // Dialogue and choices
+    m_dialogueWidget = new DialogueWidget(this);
+    mainLayout->addWidget(m_dialogueWidget, 2);
+    
+    setStyleSheet(
+        "QWidget {"
+        "    background-color: #1a1a2e;"
+        "}"
+    );
+}
+
+void GameWidget::connectSignals() {
+    Player* player = m_gameState->getPlayer();
+    GameMaster* gameMaster = m_gameState->getGameMaster();
+    Story* story = m_gameState->getStory();
+    
+    // Player signals
+    connect(player, &Player::healthChanged, this, &GameWidget::onHealthChanged);
+    connect(player, &Player::stateChanged, this, &GameWidget::onPlayerStateChanged);
+    connect(player, &Player::scoreChanged, this, [this](int score) {
+        m_scoreLabel->setText(QString("Score: %1").arg(score));
+    });
+    
+    // Game state signals
+    connect(m_gameState, &GameState::stateChanged, this, &GameWidget::onGameStateChanged);
+    connect(m_gameState, &GameState::narrativeUpdate, this, &GameWidget::onNarrativeUpdate);
+    connect(m_gameState, &GameState::gameMasterSpeaks, this, &GameWidget::onGameMasterSpeaks);
+    connect(m_gameState, &GameState::riddleResult, this, &GameWidget::onRiddleResult);
+    connect(m_gameState, &GameState::hintProvided, this, &GameWidget::onHintProvided);
+    connect(m_gameState, &GameState::gameOver, this, &GameWidget::onGameOver);
+    
+    // Story signals
+    connect(story, &Story::choicesAvailable, this, [this](QVector<QString> choices) {
+        m_dialogueWidget->setChoices(choices);
+    });
+    
+    // Dialogue widget signals
+    connect(m_dialogueWidget, &DialogueWidget::choiceSelected, m_gameState, &GameState::processChoice);
+    connect(m_dialogueWidget, &DialogueWidget::answerSubmitted, m_gameState, &GameState::submitAnswer);
+    connect(m_dialogueWidget, &DialogueWidget::hintRequested, m_gameState, &GameState::requestHint);
+}
+
+void GameWidget::startGame() {
+    m_gameState->startNewGame();
+}
+
+void GameWidget::onHealthChanged(int health, int maxHealth) {
+    m_healthBar->setHealth(health, maxHealth);
+}
+
+void GameWidget::onPlayerStateChanged(Player::State state) {
+    m_playerWidget->setPlayerState(state);
+}
+
+void GameWidget::onGameStateChanged(GameState::State state) {
+    switch (state) {
+        case GameState::State::RIDDLE_ACTIVE: {
+            m_dialogueWidget->setRiddleMode(true);
+            Riddle* riddle = m_gameState->getStory()->getCurrentRiddle();
+            if (riddle) {
+                m_dialogueWidget->setRiddleQuestion(riddle->getQuestion());
+                m_dialogueWidget->clearRiddleAnswer();
+            }
+            break;
+        }
+        case GameState::State::DIALOGUE:
+        case GameState::State::PLAYING:
+            m_dialogueWidget->setRiddleMode(false);
+            break;
+        default:
+            break;
+    }
+}
+
+void GameWidget::onNarrativeUpdate(QString text) {
+    m_dialogueWidget->setNarrative(text);
+}
+
+void GameWidget::onGameMasterSpeaks(QString dialogue) {
+    m_dialogueWidget->setGameMasterDialogue(dialogue);
+    updateGameMasterVisual();
+}
+
+void GameWidget::onRiddleResult(bool correct, QString feedback) {
+    m_dialogueWidget->showFeedback(feedback, correct);
+    
+    if (correct) {
+        // Clear riddle and show choices after a delay
+        QTimer::singleShot(1500, this, [this]() {
+            m_dialogueWidget->setRiddleMode(false);
+        });
+    } else {
+        m_dialogueWidget->clearRiddleAnswer();
+    }
+}
+
+void GameWidget::onHintProvided(QString hint) {
+    m_dialogueWidget->showHint(hint);
+}
+
+void GameWidget::onGameOver(Story::Ending ending) {
+    showEndingScreen(ending);
+}
+
+void GameWidget::updateGameMasterVisual() {
+    GameMaster* gm = m_gameState->getGameMaster();
+    
+    QString emoji = "👁️";
+    QString color = "#8B0000";
+    
+    switch (gm->getMood()) {
+        case GameMaster::Mood::AMUSED:
+            emoji = "😏";
+            color = "#FF4500";
+            break;
+        case GameMaster::Mood::IMPRESSED:
+            emoji = "🤔";
+            color = "#4169E1";
+            break;
+        case GameMaster::Mood::ANGRY:
+            emoji = "😠";
+            color = "#DC143C";
+            break;
+        case GameMaster::Mood::MENACING:
+            emoji = "💀";
+            color = "#8B0000";
+            break;
+        case GameMaster::Mood::SATISFIED:
+            emoji = "😈";
+            color = "#9400D3";
+            break;
+        default:
+            emoji = "👁️";
+            color = "#8B0000";
+            break;
+    }
+    
+    m_gameMasterVisual->setText(emoji + "\n⚡\nGAME\nMASTER\n⚡");
+    m_gameMasterVisual->setStyleSheet(
+        QString("QLabel {"
+        "    background-color: rgba(10, 10, 10, 220);"
+        "    color: %1;"
+        "    border: 3px solid %1;"
+        "    border-radius: 10px;"
+        "    padding: 20px;"
+        "}").arg(color)
+    );
+}
+
+void GameWidget::showEndingScreen(Story::Ending ending) {
+    // Create ending overlay
+    m_endingWidget = new QWidget(this);
+    m_endingWidget->setGeometry(rect());
+    m_endingWidget->setStyleSheet(
+        "QWidget {"
+        "    background-color: rgba(0, 0, 0, 230);"
+        "}"
+    );
+    
+    QVBoxLayout* layout = new QVBoxLayout(m_endingWidget);
+    layout->setAlignment(Qt::AlignCenter);
+    
+    QString endingText = m_gameState->getStory()->getEndingDescription(ending);
+    
+    QLabel* endingLabel = new QLabel(endingText, m_endingWidget);
+    endingLabel->setWordWrap(true);
+    endingLabel->setAlignment(Qt::AlignCenter);
+    endingLabel->setStyleSheet(
+        "QLabel {"
+        "    color: white;"
+        "    font-size: 18px;"
+        "    padding: 30px;"
+        "    background-color: rgba(20, 20, 40, 200);"
+        "    border: 3px solid #FFD700;"
+        "    border-radius: 15px;"
+        "}"
+    );
+    endingLabel->setMaximumWidth(600);
+    layout->addWidget(endingLabel);
+    
+    QLabel* statsLabel = new QLabel(
+        QString("Final Score: %1\nRiddles Solved: %2\nFinal Health: %3")
+            .arg(m_gameState->getPlayer()->getScore())
+            .arg(m_gameState->getPlayer()->getRiddlesSolved())
+            .arg(m_gameState->getPlayer()->getHealth()),
+        m_endingWidget
+    );
+    statsLabel->setAlignment(Qt::AlignCenter);
+    statsLabel->setStyleSheet(
+        "QLabel {"
+        "    color: #FFD700;"
+        "    font-size: 16px;"
+        "    font-weight: bold;"
+        "    padding: 20px;"
+        "}"
+    );
+    layout->addWidget(statsLabel);
+    
+    QPushButton* restartButton = new QPushButton("Play Again", m_endingWidget);
+    restartButton->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #4169E1;"
+        "    color: white;"
+        "    border: none;"
+        "    border-radius: 10px;"
+        "    padding: 15px 40px;"
+        "    font-size: 16px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #5179F1;"
+        "}"
+    );
+    connect(restartButton, &QPushButton::clicked, this, [this]() {
+        if (m_endingWidget) {
+            m_endingWidget->deleteLater();
+            m_endingWidget = nullptr;
+        }
+        startGame();
+    });
+    layout->addWidget(restartButton, 0, Qt::AlignCenter);
+    
+    m_endingWidget->show();
+}
+
+void GameWidget::paintEvent(QPaintEvent* event) {
+    QPainter painter(this);
+    
+    // Draw atmospheric background
+    QLinearGradient gradient(0, 0, 0, height());
+    gradient.setColorAt(0, QColor(26, 26, 46));
+    gradient.setColorAt(1, QColor(13, 13, 23));
+    painter.fillRect(rect(), gradient);
+    
+    QWidget::paintEvent(event);
+}

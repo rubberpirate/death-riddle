@@ -1,0 +1,12 @@
+# Placeholder for game icon
+# To add a real icon, place a PNG image here named 'icon.png'
+# Recommended size: 256x256 or 512x512 pixels
+# 
+# The icon could feature:
+# - A stylized skull or death symbol
+# - Question marks for riddles
+# - Dark mysterious atmosphere
+# - Red and black color scheme
+
+# For now, this is just a placeholder file
+# The game will work fine without a custom icon

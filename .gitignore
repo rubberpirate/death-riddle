@@ -1,0 +1,43 @@
+# Build directory
+build/
+bin/
+*.user
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Qt generated files
+*.qrc.depends
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.autosave
+
+# Compiled files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE files
+.vscode/
+.idea/
+*.pro.user
+*.pro.user.*
+
+# Save files
+saves/
+*.json
+
+# Mac
+.DS_Store
+
+# Backup files
+*~
+*.bak
