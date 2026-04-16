@@ -6,7 +6,7 @@ A 2D platformer puzzle game where you must solve riddles to escape from the myst
 
 
 
-## 📖 Story## Story
+## 📖 Story## Story:)
 
 
 
